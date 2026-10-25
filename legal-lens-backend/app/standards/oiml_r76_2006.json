@@ -1,0 +1,30 @@
+{
+  "id": "OIML R 76-1:2006",
+  "title": "OIML R 76-1 (2006) Non-automatic weighing instruments - Part 1: Metrological and technical requirements - Tests",
+  "required_tests": ["weighing", "eccentricity", "repeatability", "discrimination"],
+  "optional_tests": ["temperature_zero"],
+  "mpe_verification": {
+    "I":    [[50000, 0.5], [200000, 1.0], [null, 1.5]],
+    "II":   [[5000, 0.5],  [20000, 1.0],  [100000, 1.5]],
+    "III":  [[500, 0.5],   [2000, 1.0],   [10000, 1.5]],
+    "IIII": [[50, 0.5],    [200, 1.0],    [1000, 1.5]]
+  },
+  "in_service_factor": 2,
+  "min_capacity_e": {"I": 100, "II": 20, "III": 20, "IIII": 10},
+  "n_limits": [
+    {"class": "I",    "e_min_g": 0.001, "e_max_g": null, "n_min": 50000, "n_max": null},
+    {"class": "II",   "e_min_g": 0.001, "e_max_g": 0.1,  "n_min": 100,   "n_max": 100000},
+    {"class": "II",   "e_min_g": 0.1,   "e_max_g": null, "n_min": 5000,  "n_max": 100000},
+    {"class": "III",  "e_min_g": 0.1,   "e_max_g": 5,    "n_min": 100,   "n_max": 10000},
+    {"class": "III",  "e_min_g": 5,     "e_max_g": null, "n_min": 500,   "n_max": 10000},
+    {"class": "IIII", "e_min_g": 5,     "e_max_g": null, "n_min": 100,   "n_max": 1000}
+  ],
+  "temperature_step_c": {"I": 1, "II": 2, "III": 5, "IIII": 5},
+  "discrimination_added_factor": 1.4,
+  "repeatability": {
+    "max_kg_threshold": 1000,
+    "readings_if_at_or_below": 10,
+    "readings_if_above": 3,
+    "minimum_readings": 3
+  }
+}

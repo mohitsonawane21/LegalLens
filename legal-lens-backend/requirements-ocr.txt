@@ -1,0 +1,3 @@
+# Optional: automatic weight reading from the test video (also needs the Tesseract binary installed)
+opencv-python-headless>=4.9
+pytesseract>=0.3.10
