@@ -24,10 +24,11 @@ import r76
 import report as rpt
 
 BASE = Path(__file__).parent
-UPLOADS = db.DATA_DIR / "uploads"
-GENERATED = db.DATA_DIR / "generated"
+UPLOADS = Path("/tmp/legal_lens/uploads")
+GENERATED = Path("/tmp/legal_lens/generated")
 SAMPLE_DIR = BASE / "sample"
 SAMPLE_VIDEO = "sample_scale_reading.mp4"
+
 VIDEO_EXT = {".mp4", ".mov", ".avi", ".webm"}
 PHOTO_EXT = {".jpg", ".jpeg", ".png", ".webp"}
 DOC_EXT = {".pdf", ".docx", ".xlsx", ".txt", ".csv"}
