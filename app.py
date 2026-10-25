@@ -36,16 +36,11 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024          # "Max size 500 MB"
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
-
 def _secret() -> str:
     env = os.environ.get("LEGAL_LENS_SECRET")
     if env:
         return env
-    db.DATA_DIR.mkdir(exist_ok=True)
-    f = db.DATA_DIR / "secret.key"
-    if not f.exists():
-        f.write_text(secrets.token_hex(32))
-    return f.read_text().strip()
+    return secrets.token_hex(32)
 
 
 app.secret_key = _secret()
