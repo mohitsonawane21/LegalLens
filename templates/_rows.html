@@ -1,0 +1,22 @@
+{% from '_icons.html' import ic %}
+<table class="t">
+  <thead><tr><th>Test ID</th><th>Instrument</th><th>Make / Model</th><th>Date</th><th>Status</th><th>Result</th><th></th></tr></thead>
+  <tbody>
+  {% for r in (tests if tests is defined else rows) %}
+  {% set ov = r.result.get('overall') %}
+  <tr>
+    <td><b>{{ r.id }}</b></td>
+    <td><a href="{{ url_for('reports', instrument=r.instrument_id) }}" title="Instrument history">{{ r.instrument_id }}</a><div style="font-size:12px;color:var(--muted)">{{ r.instrument_type }} · {{ r.serial_number }}</div></td>
+    <td>{{ r.manufacturer }} {{ r.model }}<div style="font-size:12px;color:var(--muted)">{{ '%g'|format(r.capacity) }} {{ r.unit }} / {{ '%g'|format(r.division) }} {{ r.unit }}</div></td>
+    <td>{{ r.test_date|dt('date') }}</td>
+    <td>{% if r.status=='completed' %}<span class="chip pass">Completed</span>{% else %}<span class="chip warn">In process</span>{% endif %}</td>
+    <td>{% if r.status=='completed' %}<span class="chip {{ 'pass' if ov=='PASS' else 'fail' }}">{{ ov }}</span>{% else %}–{% endif %}</td>
+    <td style="white-space:nowrap;text-align:right">
+      {% if r.status=='completed' %}<a class="btn sm" href="{{ url_for('report_page', test_id=r.id) }}">View report</a>
+      {% else %}<a class="btn sm ghost" href="{{ url_for('upload_page', test_id=r.id) }}">Video</a> <a class="btn sm" href="{{ url_for('observations_page', test_id=r.id) }}">Continue</a>{% endif %}
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:26px">No records found.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>

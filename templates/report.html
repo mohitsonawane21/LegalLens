@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% from '_icons.html' import ic %}
+{% block title %}Test Report {{ t.id }}{% endblock %}
+{% set R = t.result %}
+{% set ov = R.get('overall') %}
+{% set cls = 'pass' if ov=='PASS' else ('fail' if ov=='FAIL' else 'warn') %}
+{% block content %}
+<a class="back" href="{{ url_for('reports') }}">{{ ic('back') }} Back to Reports</a>
+<div class="rep-head">
+  <div>
+    <h1 class="pagetitle" style="margin-top:0">Test Report</h1>
+    <p class="pagesub" style="margin-bottom:10px">View, download and verify the complete test report for the selected instrument.</p>
+  </div>
+  <div class="banner">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#15803d"/><path d="m7 12.4 3.2 3.2L17 8.8" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div><b>Report Generated Successfully</b><span>The test report for {{ t.instrument_id }} has been created and is ready.</span></div>
+    <time>{{ t.report_generated_at|dt }}</time>
+  </div>
+</div>
+
+{% set tabs = [('overview','Report Overview'),('details','Test Details'),('observations','Observations'),('calculations','Calculations'),('compliance','Compliance'),('attachments','Attachments'),('audit','Audit Trail')] %}
+<div class="tabs">{% for k,l in tabs %}<a href="{{ url_for('report_page', test_id=t.id, tab=k) }}" class="{{ 'on' if tab==k else '' }}">{{ l }}</a>{% endfor %}</div>
+
+<div class="rep-grid">
+  <!-- ============ LEFT (overview) / WIDE (other tabs) ============ -->
+  {% if tab == 'overview' %}
+  <div style="display:flex;flex-direction:column;gap:18px">
+    <div class="card kv">
+      <h3>{{ ic('scale') }} Instrument Information</h3>
+      <div class="row"><span>Instrument ID</span><b>{{ t.instrument_id }}</b></div>
+      <div class="row"><span>Instrument Type</span><b>{{ t.instrument_type }}</b></div>
+      <div class="row"><span>Make / Manufacturer</span><b>{{ t.manufacturer }}</b></div>
+      <div class="row"><span>Model</span><b>{{ t.model }}</b></div>
+      <div class="row"><span>Capacity (Max)</span><b>{{ '%g'|format(t.capacity) }} {{ t.unit }}</b></div>
+      <div class="row"><span>Division (d)</span><b>{{ '%g'|format(t.division) }} {{ t.unit }}</b></div>
+      <div class="row"><span>Serial Number</span><b>{{ t.serial_number }}</b></div>
+      <div class="row"><span>Location / Laboratory</span><b>{{ t.location }}</b></div>
+    </div>
+    <div class="card kv">
+      <h3>{{ ic('calendar') }} Test Information</h3>
+      <div class="row"><span>Test ID</span><b>{{ t.id }}</b></div>
+      <div class="row"><span>Date of Test</span><b>{{ t.test_date|dt('date') }}</b></div>
+      <div class="row"><span>Test Standard</span><b>{{ t.test_standard }}</b></div>
+      <div class="row"><span>Uploaded by</span><b>{{ t.created_by }}</b></div>
+      <div class="row"><span>Report Generated On</span><b>{{ t.report_generated_at|dt }}</b></div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card tabpane" style="grid-column:1/3">
+    {% if tab == 'details' %}
+      <h3>{{ ic('scale') }} Test Details</h3>
+      <table class="t"><tbody>
+        {% for k,v in [('Instrument ID',t.instrument_id),('Instrument type',t.instrument_type),('Make / Manufacturer',t.manufacturer),('Model',t.model),('Serial number',t.serial_number),('Capacity (Max)', '%g %s'|format(t.capacity,t.unit)),('Division (d)','%g %s'|format(t.division,t.unit)),('Verification interval (e)','%g %s'|format(t.verification_interval,t.unit)),('Accuracy class',t.accuracy_class),('n = Max / e', R.get('n')),('Location', t.location),('Standard', t.test_standard ~ ' (' ~ R.get('edition','') ~ ')')] %}
+        <tr><td style="width:36%;color:var(--muted)">{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}
+      </tbody></table>
+      <h3 style="margin-top:20px">{{ ic('clock') }} Laboratory &amp; environmental conditions</h3>
+      <table class="t"><tbody>
+        {% set e = t.env %}
+        {% for k,v in [('Temperature', fmt(e.get('temperature_c'),1,'°C')),('Relative humidity', fmt(e.get('humidity_pct'),0,'%')),('Pressure', fmt(e.get('pressure_hpa'),0,'hPa')),('Standard weights used', e.get('weights_used') or '–'),('Tested by', e.get('tested_by') or '–'),('Remarks', e.get('remarks') or '–')] %}
+        <tr><td style="width:36%;color:var(--muted)">{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}
+      </tbody></table>
+      <h3 style="margin-top:20px">{{ ic('film') }} Video evidence</h3>
+      {% if t.video_name %}
+      <table class="t"><tbody>
+        <tr><td style="width:36%;color:var(--muted)">Video</td><td><a href="{{ url_for('serve_video', test_id=t.id) }}" target="_blank">{{ t.video_name }}</a> ({{ '%g'|format(t.video_duration or 0) }} s)</td></tr>
+        <tr><td style="color:var(--muted)">SHA-256</td><td style="font-family:monospace;font-size:12px;word-break:break-all">{{ t.video_sha256 or '(bundled sample)' }}</td></tr>
+        <tr><td style="color:var(--muted)">OCR reading</td><td>{{ t.reading_raw|num(6) }} kg</td></tr>
+        <tr><td style="color:var(--muted)">Confirmed reading</td><td><b>{{ t.reading_confirmed|num(6) }} kg</b> at {{ t.reading_confirmed_at|dt }}</td></tr>
+      </tbody></table>
+      {% else %}<p style="color:var(--muted)">No video evidence attached.</p>{% endif %}
+
+    {% elif tab == 'observations' %}
+      <h3>{{ ic('tests') }} Recorded observations</h3>
+      {% set w = R.get('tests',{}).get('weighing') %}
+      {% if w and w.rows %}
+      <h4 style="margin:6px 0">Weighing test – {{ w.clause }}</h4>
+      <table class="t"><thead><tr><th>Load ({{ t.unit }})</th><th class="num">Ind. ↑</th><th class="num">ΔL ↑</th><th class="num">Ind. ↓</th><th class="num">ΔL ↓</th></tr></thead><tbody>
+      {% for r in w.rows %}<tr><td>{{ r.load|num(3) }}</td><td class="num">{{ r.up.indication|num(3) if r.up else '–' }}</td><td class="num">{{ r.up.delta_l|num(4) if r.up else '–' }}</td><td class="num">{{ r.down.indication|num(3) if r.down else '–' }}</td><td class="num">{{ r.down.delta_l|num(4) if r.down else '–' }}</td></tr>{% endfor %}
+      </tbody></table>{% endif %}
+      {% set ec = R.get('tests',{}).get('eccentricity') %}
+      {% if ec and ec.rows %}<h4 style="margin:16px 0 6px">Eccentricity – load {{ ec.load|num(3) }} {{ t.unit }}</h4>
+      <table class="t"><thead><tr><th>Position</th><th class="num">Indication</th><th class="num">ΔL</th></tr></thead><tbody>
+      {% for r in ec.rows %}<tr><td>{{ r.position }}</td><td class="num">{{ r.indication|num(3) }}</td><td class="num">{{ r.delta_l|num(4) }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+      {% set rp = R.get('tests',{}).get('repeatability') %}
+      {% if rp and rp.series %}<h4 style="margin:16px 0 6px">Repeatability</h4>
+      <table class="t"><thead><tr><th>Load</th><th>Weighings (errors)</th></tr></thead><tbody>
+      {% for r in rp.series %}<tr><td>{{ r.load|num(3) }}</td><td>{{ r.errors|join(',  ') }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+      {% set ds = R.get('tests',{}).get('discrimination') %}
+      {% if ds and ds.rows %}<h4 style="margin:16px 0 6px">Discrimination</h4>
+      <table class="t"><thead><tr><th>Load</th><th class="num">Before</th><th class="num">After</th></tr></thead><tbody>
+      {% for r in ds.rows %}<tr><td>{{ r.load|num(3) }}</td><td class="num">{{ r.ind_before|num(3) }}</td><td class="num">{{ r.ind_after|num(3) }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+
+    {% elif tab == 'calculations' %}
+      <h3>{{ ic('scale') }} Calculations – {{ R.get('edition') }}</h3>
+      <div class="note" style="margin:0 0 12px">{{ ic('info') }}<div>n = Max/e = <b>{{ R.get('n') }}</b> &nbsp;·&nbsp; MPE = 0.5e / 1.0e / 1.5e by load band of class {{ t.accuracy_class }} &nbsp;·&nbsp; E = I + ½e − ΔL − L &nbsp;·&nbsp; pass if |E| ≤ MPE</div></div>
+      {% set w = R.get('tests',{}).get('weighing') %}
+      {% if w and w.rows %}
+      <table class="t"><thead><tr><th>Load</th><th class="num nocase">m = L/e</th><th class="num">MPE factor</th><th class="num">MPE</th><th class="num">E ↑</th><th></th><th class="num">E ↓</th><th></th></tr></thead><tbody>
+      {% for r in w.rows %}<tr><td>{{ r.load|num(3) }}</td><td class="num">{{ r.up.m if r.up else '–' }}</td><td class="num">{{ r.up.mpe_factor if r.up else '–' }}e</td><td class="num">±{{ r.mpe|num(4) }}</td>
+        <td class="num">{{ '%+.4f'|format(r.up.error) if r.up else '–' }}</td><td>{% if r.up %}<span class="{{ 'ok' if r.up.pass else 'bad' }}">{{ '✓' if r.up.pass else '✗' }}</span>{% endif %}</td>
+        <td class="num">{{ '%+.4f'|format(r.down.error) if r.down else '–' }}</td><td>{% if r.down %}<span class="{{ 'ok' if r.down.pass else 'bad' }}">{{ '✓' if r.down.pass else '✗' }}</span>{% endif %}</td></tr>{% endfor %}
+      </tbody></table>{% endif %}
+      {% set ec = R.get('tests',{}).get('eccentricity') %}
+      {% if ec and ec.rows %}<h4 style="margin:16px 0 6px">Eccentricity</h4><table class="t"><thead><tr><th>Position</th><th class="num">Error</th><th class="num">MPE</th><th></th></tr></thead><tbody>
+      {% for r in ec.rows %}<tr><td>{{ r.position }}</td><td class="num">{{ '%+.4f'|format(r.error) }}</td><td class="num">±{{ r.mpe|num(4) }}</td><td><span class="{{ 'ok' if r.pass else 'bad' }}">{{ '✓' if r.pass else '✗' }}</span></td></tr>{% endfor %}</tbody></table>{% endif %}
+      {% set rp = R.get('tests',{}).get('repeatability') %}
+      {% if rp and rp.series %}<h4 style="margin:16px 0 6px">Repeatability (max − min error ≤ MPE)</h4><table class="t"><thead><tr><th>Load</th><th class="num">Spread</th><th class="num">MPE</th><th></th></tr></thead><tbody>
+      {% for r in rp.series %}<tr><td>{{ r.load|num(3) }}</td><td class="num">{{ r.spread|num(4) }}</td><td class="num">±{{ r.mpe|num(4) }}</td><td><span class="{{ 'ok' if r.pass else 'bad' }}">{{ '✓' if r.pass else '✗' }}</span></td></tr>{% endfor %}</tbody></table>{% endif %}
+      {% set ds = R.get('tests',{}).get('discrimination') %}
+      {% if ds and ds.rows %}<h4 style="margin:16px 0 6px">Discrimination (change ≥ d after adding 1.4 d)</h4><table class="t"><thead><tr><th>Load</th><th class="num">Change</th><th class="num">Required</th><th></th></tr></thead><tbody>
+      {% for r in ds.rows %}<tr><td>{{ r.load|num(3) }}</td><td class="num">{{ r.change|num(4) }}</td><td class="num">{{ r.required|num(4) }}</td><td><span class="{{ 'ok' if r.pass else 'bad' }}">{{ '✓' if r.pass else '✗' }}</span></td></tr>{% endfor %}</tbody></table>{% endif %}
+
+    {% elif tab == 'compliance' %}
+      <h3>{{ ic('shield') }} Compliance determination</h3>
+      <div class="comp" style="margin:0 0 14px"><div class="res {{ 'fail' if ov=='FAIL' else ('warn' if ov!='PASS' else '') }}"><strong>{{ ov }}</strong><small>{{ R.get('summary') }}</small></div></div>
+      <table class="t"><thead><tr><th>Test</th><th>Clause</th><th>Result</th><th class="num">Max |error|</th></tr></thead><tbody>
+      {% for k,x in R.get('tests',{}).items() %}<tr><td>{{ x.title }}</td><td>{{ x.clause }}</td><td><span class="chip {{ 'pass' if x.pass else ('fail' if x.evaluated else 'warn') }}">{{ 'PASS' if x.pass else ('FAIL' if x.evaluated else 'NOT TESTED') }}</span></td><td class="num">{{ x.max_abs_error|num(4) if x.max_abs_error is defined else '–' }}</td></tr>{% endfor %}
+      </tbody></table>
+      {% if issues_all %}<h4 style="margin:16px 0 6px">Validation notes</h4><ul class="issues">{% for i in issues_all %}<li class="{{ i.level }}">{{ i.message }}</li>{% endfor %}</ul>{% endif %}
+
+    {% elif tab == 'attachments' %}
+      <h3>{{ ic('doc') }} Photographs &amp; supporting documents</h3>
+      {% if atts %}<table class="t"><thead><tr><th>File</th><th>Type</th><th>Uploaded</th><th>SHA-256</th></tr></thead><tbody>
+      {% for a in atts %}<tr><td><a href="{{ url_for('serve_attachment', aid=a.id) }}" target="_blank">{{ a.filename }}</a></td><td>{{ a.kind }}</td><td>{{ a.uploaded_at|dt }}</td><td style="font-family:monospace;font-size:11.5px">{{ a.sha256[:20] }}…</td></tr>{% endfor %}</tbody></table>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">{% for a in atts if a.kind=='photo' %}<a href="{{ url_for('serve_attachment', aid=a.id) }}" target="_blank"><img src="{{ url_for('serve_attachment', aid=a.id) }}" style="height:110px;border-radius:6px;border:1px solid var(--line)"></a>{% endfor %}</div>
+      {% else %}<p style="color:var(--muted)">No photographs or documents attached. {% if editable %}Add them from the <a href="{{ url_for('observations_page', test_id=t.id) }}">observations page</a>.{% endif %}</p>{% endif %}
+      {% if t.video_name %}<h4 style="margin:18px 0 6px">Video evidence</h4><p><a href="{{ url_for('serve_video', test_id=t.id) }}" target="_blank">{{ t.video_name }}</a> – confirmed reading <b>{{ t.reading_confirmed|num(6) }} kg</b></p>{% endif %}
+
+    {% elif tab == 'audit' %}
+      <h3>{{ ic('clock') }} Audit trail</h3>
+      <table class="t"><thead><tr><th>When</th><th>User</th><th>Action</th><th>Detail</th></tr></thead><tbody>
+      {% for a in audit_rows %}<tr><td style="white-space:nowrap">{{ a.ts|dt }}</td><td>{{ a.user }}</td><td>{{ a.action }}</td><td style="color:var(--muted)">{{ a.detail }}</td></tr>{% endfor %}</tbody></table>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- ============ CENTER : PDF viewer (overview only) ============ -->
+  {% if tab == 'overview' %}
+  <div class="card viewer">
+    <div class="vbar">
+      {% if pages %}<div class="grp"><button id="pPrev" title="Previous page">{{ ic('prev') }}</button><span class="pg" id="pgTxt">1 / {{ pages|length }}</span><button id="pNext" title="Next page">{{ ic('next') }}</button></div>
+      <div class="grp"><button id="zOut" title="Zoom out">{{ ic('minus') }}</button><span class="pg" id="zTxt">100%</span><button id="zIn" title="Zoom in">{{ ic('plus') }}</button></div>{% endif %}
+      <button class="sq" id="vFit" title="Fit to width">{{ ic('doc') }}</button>
+      <button class="sq" id="vPrint" title="Print">{{ ic('print') }}</button>
+      <a class="sq" href="{{ url_for('report_file', test_id=t.id, kind='pdf') }}" title="Download PDF" style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;color:var(--ink)">{{ ic('download') }}</a>
+      <button class="sq" id="vFull" title="Full screen">{{ ic('full') }}</button>
+    </div>
+    <div class="page-stage" id="stage">
+      {% if pages %}<img id="pageImg" src="{{ url_for('report_page_img', test_id=t.id, name=pages[0]) }}" alt="Report page 1">
+      {% else %}<iframe src="{{ url_for('report_file', test_id=t.id, kind='preview') }}#view=FitH" title="Report preview"></iframe>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ============ RIGHT : actions ============ -->
+  <div>
+    <div class="acts">
+      <div class="menu">
+        <div class="split">
+          <a class="btn" href="{{ url_for('report_file', test_id=t.id, kind='pdf') }}">{{ ic('download') }} Download PDF</a>
+          <button class="btn" id="ddBtn" aria-label="More PDF options">{{ ic('chev-down') }}</button>
+        </div>
+        <div class="dd" id="dd"><a href="{{ url_for('report_file', test_id=t.id, kind='pdf') }}">Download PDF (A4)</a><a href="{{ url_for('report_file', test_id=t.id, kind='preview') }}" target="_blank">Open PDF in new tab</a></div>
+      </div>
+      <a class="btn ghost" href="{{ url_for('report_file', test_id=t.id, kind='docx') }}">{{ ic('doc') }} Download Editable (DOCX)</a>
+      <button class="btn ghost" id="shareBtn">{{ ic('share') }} Share Report</button>
+      <button class="btn ghost" id="qrBtn">{{ ic('qr') }} Verify with QR</button>
+      <button class="btn ghost" id="signBtn" {% if t.signed_by or user.role=='viewer' %}disabled{% endif %}>{{ ic('pen') }} {{ 'Signed by ' ~ t.signed_by if t.signed_by else 'Add Digital Signature' }}</button>
+    </div>
+
+    <div class="verif" style="margin-top:20px" id="verifCard">
+      <h4>Report Verification</h4>
+      <div class="qrrow">{{ qr|safe }}<p>Scan this QR code to verify<br>the authenticity of this report.</p></div>
+      <div class="hash"><b>SHA-256 Hash <button id="copyHash" style="background:none;border:0;cursor:pointer;color:var(--ink)" title="Copy hash">{{ ic('copy') }}</button></b>
+        <code id="hashTxt">{{ t.report_hash[:32] }}<br>{{ t.report_hash[32:] }}</code></div>
+    </div>
+
+    <div class="comp">
+      <h4>Compliance Result</h4>
+      <div class="res {{ 'fail' if ov=='FAIL' else ('warn' if ov not in ('PASS','FAIL') else '') }}">
+        {% if ov=='PASS' %}<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#15803d"/><path d="m7 12.4 3.2 3.2L17 8.8" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        {% else %}<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="{{ '#b91c1c' if ov=='FAIL' else '#b45309' }}"/><path d="M8 8l8 8M16 8l-8 8" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>{% endif %}
+        <strong>{{ ov }}</strong><small>{{ R.get('summary') }}</small>
+      </div>
+    </div>
+
+    {% if not hash_ok %}
+    <div class="note bad">{{ ic('info') }}<div>Integrity warning: the stored record no longer matches the hash printed on this report. Regenerate the report after reviewing changes.</div></div>
+    {% elif t.signed_by %}
+    <div class="note">{{ ic('info') }}<div>This report is digitally signed by <b>{{ t.signed_by }}</b> and secured with SHA-256 hashing for authenticity and integrity.</div></div>
+    {% else %}
+    <div class="note">{{ ic('info') }}<div>This report is secured with SHA-256 hashing for authenticity and integrity. Use “Add Digital Signature” to sign it.</div></div>
+    {% endif %}
+    {% if user.role=='admin' %}<p style="margin-top:12px;font-size:12.5px"><a href="#" id="reopen">Reopen for editing</a></p>{% endif %}
+  </div>
+</div>
+
+<div class="modal" id="qrModal"><div class="box">
+  <h3>Verify this report</h3>
+  <div style="display:flex;justify-content:center;margin:6px 0">{{ qr_big|safe if qr_big is defined else qr|safe }}</div>
+  <p style="font-size:12.5px;color:var(--muted);word-break:break-all">{{ t.verify_url }}</p>
+  <p id="qrStatus" style="font-weight:600">Checking…</p>
+  <div style="display:flex;gap:10px;justify-content:center"><a class="btn sm" href="{{ t.verify_url }}" target="_blank">Open verification page</a><button class="btn ghost sm" onclick="document.getElementById('qrModal').classList.remove('open')">Close</button></div>
+</div></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TID={{ t.id|tojson }}, PAGES={{ pages|tojson }}, VURL={{ t.verify_url|tojson }};
+const $=id=>document.getElementById(id);
+let pg=0, zoom=1;
+function show(){ if(!PAGES.length || !$('pageImg')) return; $('pageImg').src='/reports/'+TID+'/page/'+PAGES[pg]; $('pgTxt').textContent=(pg+1)+' / '+PAGES.length; $('pageImg').style.width=(zoom*100)+'%'; $('zTxt').textContent=Math.round(zoom*100)+'%'; }
+if(PAGES.length && $('pPrev')){
+  $('pPrev').onclick=()=>{pg=Math.max(0,pg-1);show()}; $('pNext').onclick=()=>{pg=Math.min(PAGES.length-1,pg+1);show()};
+  $('zIn').onclick=()=>{zoom=Math.min(2.5,zoom+.25);show()}; $('zOut').onclick=()=>{zoom=Math.max(.5,zoom-.25);show()}; $('vFit').onclick=()=>{zoom=1;show()};
+}
+if($('vPrint')) $('vPrint').onclick=()=>{ const w=window.open('/reports/'+TID+'/file/preview'); if(w) w.addEventListener('load',()=>setTimeout(()=>w.print(),600)); };
+if($('vFull')) $('vFull').onclick=()=>{ const s=$('stage'); document.fullscreenElement? document.exitFullscreen() : s.requestFullscreen && s.requestFullscreen(); };
+$('ddBtn').onclick=e=>{e.stopPropagation(); $('dd').classList.toggle('open')}; document.addEventListener('click',()=>$('dd').classList.remove('open'));
+$('copyHash').onclick=()=>{ navigator.clipboard.writeText({{ t.report_hash|tojson }}).then(()=>toast('SHA-256 hash copied')).catch(()=>toast('Copy failed',true)) };
+$('shareBtn').onclick=async()=>{
+  const data={title:'Test Report '+TID, text:'Verify this Legal Lens test report', url:VURL};
+  if(navigator.share){ try{ await navigator.share(data); return }catch(e){ if(e.name==='AbortError') return } }
+  try{ await navigator.clipboard.writeText(VURL); toast('Verification link copied to clipboard') }catch(e){ prompt('Copy this verification link:',VURL) }
+};
+$('qrBtn').onclick=async()=>{
+  $('qrModal').classList.add('open'); $('qrStatus').textContent='Checking…'; $('qrStatus').style.color='';
+  const r=await api('/verify/'+TID+'.json');
+  if(r.status==='authentic'){ $('qrStatus').textContent='✓ Authentic – hash matches the stored record'; $('qrStatus').style.color='#087a55' }
+  else { $('qrStatus').textContent='✗ Record does not match the report hash'; $('qrStatus').style.color='#b91c1c' }
+};
+$('qrModal').onclick=e=>{ if(e.target.id==='qrModal') $('qrModal').classList.remove('open') };
+$('signBtn').onclick=async()=>{ const r=await jpost('/api/tests/'+TID+'/sign'); if(r.ok){ toast('Report digitally signed by '+r.signed_by); setTimeout(()=>location.reload(),700) } else toast(r.error,true) };
+if($('reopen')) $('reopen').onclick=async e=>{ e.preventDefault(); if(!confirm('Reopen this report for editing? The signature will be removed and the report must be regenerated.')) return; const r=await jpost('/api/tests/'+TID+'/reopen'); if(r.ok) location.href=r.url; else toast(r.error,true) };
+</script>
+{% endblock %}

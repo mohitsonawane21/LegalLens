@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% from '_icons.html' import ic %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="eyebrow">Administration</div>
+<h1 class="pagetitle">Settings</h1>
+<p class="pagesub">Laboratory details are auto-populated into every report.</p>
+<div class="up-grid" style="grid-template-columns:1fr 1fr">
+<form method="post" class="card" style="display:grid;gap:14px">
+  <h3>{{ ic('settings') }} Laboratory &amp; signatory</h3>
+  <div><label>Laboratory name</label><input name="lab_name" value="{{ lab.lab_name }}"></div>
+  <div><label>Section</label><input name="lab_section" value="{{ lab.lab_section }}"></div>
+  <div><label>Default signatory</label><input name="signatory_name" value="{{ lab.signatory_name }}"></div>
+  <div><label>Designation</label><input name="signatory_designation" value="{{ lab.signatory_designation }}"></div>
+  <div><label>OIML R 76 rule set (updatable without code changes)</label><select name="rules_file">{% for f in rules_files %}<option {{ 'selected' if f==lab.rules_file }}>{{ f }}</option>{% endfor %}</select>
+    <small style="color:var(--muted)">Active edition: {{ rules.edition }}. Drop a new JSON in <code>/rules</code> when OIML revises R 76.</small></div>
+  <button class="btn">Save settings</button>
+</form>
+<div class="card"><h3>{{ ic('user') }} Users &amp; roles</h3>
+<table class="t"><thead><tr><th>User</th><th>Name</th><th>Role</th></tr></thead><tbody>{% for u in users %}<tr><td>{{ u.username }}</td><td>{{ u.full_name }}<div style="font-size:12px;color:var(--muted)">{{ u.designation }}</div></td><td><span class="chip info">{{ u.role }}</span></td></tr>{% endfor %}</tbody></table></div>
+</div>
+{% endblock %}

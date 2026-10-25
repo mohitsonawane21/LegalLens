@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<div class="login-wrap">
+  <div class="eyebrow">Secure access</div>
+  <h1 class="pagetitle" style="font-size:34px">Sign in</h1>
+  <p class="pagesub">Role-based access for administrators, test officers and viewers.</p>
+  <form method="post" class="card" style="display:grid;gap:14px">
+    <div><label>Username</label><input name="username" autofocus required autocomplete="username"></div>
+    <div><label>Password</label><input name="password" type="password" required autocomplete="current-password"></div>
+    <button class="btn" type="submit">Sign in</button>
+  </form>
+  <div class="card" style="margin-top:14px;font-size:12.5px">
+    <b>Demo accounts</b>
+    <table class="t" style="margin-top:6px"><tr><th>User</th><th>Password</th><th>Role</th></tr>
+    <tr><td>admin</td><td>admin123</td><td>all rights, settings, reopen / delete</td></tr>
+    <tr><td>tester</td><td>tester123</td><td>create tests, enter observations, generate &amp; sign reports</td></tr>
+    <tr><td>viewer</td><td>viewer123</td><td>read-only, download reports</td></tr></table>
+  </div>
+</div>
+{% endblock %}

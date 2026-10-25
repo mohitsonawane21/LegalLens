@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Legal Lens{% endblock %} · Test · Verify · Ensure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+{% from '_icons.html' import ic %}
+
+<header class="hdr">
+  <div class="emblem"><img src="{{ url_for('static', filename='img/emblem.png') }}" alt="Government of India"></div>
+  <a class="logo" href="{{ url_for('home') }}"><img src="{{ url_for('static', filename='img/logo.png') }}" alt="Legal Lens – Test · Verify · Ensure"></a>
+  <img class="chakra" src="{{ url_for('static', filename='img/chakra.png') }}" alt="">
+  <div class="tag">Accurate Weights<br>for a Fairer<br>Tomorrow</div>
+  {% if user %}<div class="who"><span>{{ user.full_name or user.username }} · <b>{{ user.role }}</b></span><a href="{{ url_for('logout') }}">Sign out</a></div>{% endif %}
+</header>
+
+<div class="shell">
+  {% if user %}
+  <aside class="side">
+    <nav>
+      {% set items = [('home','Home','home',['home']),('features','Features','features',['features']),('tests','Tests','tests',['tests','new_test','upload_page','observations_page']),('reports','Reports','reports',['reports','report_page']),('settings','Settings','settings',['settings'])] %}
+      {% for ep,label,ic_name,eps in items %}
+      <a href="{{ url_for(ep) }}" class="{{ 'on' if nav in eps else '' }}">{{ ic(ic_name) }}<span>{{ label }}</span></a>
+      {% endfor %}
+    </nav>
+  </aside>
+  {% endif %}
+  <main class="main">
+    {% with msgs = get_flashed_messages(with_categories=true) %}{% for cat,m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}{% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+function toast(msg, err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(err?' err':'');clearTimeout(window._tt);window._tt=setTimeout(()=>t.className='toast',3200)}
+async function api(url, opts={}){
+  const r = await fetch(url, opts); let j={}; try{ j = await r.json() }catch(e){}
+  if(!r.ok && !j.error) j.error = 'Request failed ('+r.status+')'; j._status=r.status; return j;
+}
+const jpost=(u,b)=>api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

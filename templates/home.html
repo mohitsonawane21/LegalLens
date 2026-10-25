@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% from '_icons.html' import ic %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<div class="eyebrow">Dashboard</div>
+<h1 class="pagetitle">Test Management</h1>
+<p class="pagesub">Monitor testing activity and report status for Non-Automatic Weighing Instruments (OIML R 76).</p>
+<div class="stats">
+  <div class="stat"><b>{{ stats.total }}</b><span>Total tests</span></div>
+  <div class="stat g"><b>{{ stats.completed }}</b><span>Completed</span></div>
+  <div class="stat o"><b>{{ stats.in_process }}</b><span>In process</span></div>
+  <div class="stat g"><b>{{ stats.pass }}</b><span>Passed</span></div>
+  <div class="stat r"><b>{{ stats.fail }}</b><span>Failed</span></div>
+</div>
+{% if user.role != 'viewer' %}
+<div class="actions-row"><a class="btn" href="{{ url_for('new_test') }}">{{ ic('plus') }} New Test</a>
+<a class="btn ghost" href="{{ url_for('tests') }}">{{ ic('tests') }} All Tests</a><a class="btn ghost" href="{{ url_for('reports') }}">{{ ic('reports') }} Report Repository</a></div>{% endif %}
+<div class="card">
+  <h3>Recent activity</h3>
+  <form action="{{ url_for('reports') }}" class="filters"><input name="q" placeholder="Search report by test ID, instrument, make, model, serial…"><button class="btn sm">{{ ic('search') }} Search</button></form>
+  {% include '_rows.html' %}
+</div>
+{% endblock %}

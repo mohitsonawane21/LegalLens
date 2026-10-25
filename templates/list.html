@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% from '_icons.html' import ic %}
+{% block title %}{{ 'Reports' if mode=='reports' else 'Tests' }}{% endblock %}
+{% block content %}
+<div class="eyebrow">{{ 'Report repository' if mode=='reports' else 'Test management' }}</div>
+<h1 class="pagetitle">{{ 'Reports' if mode=='reports' else 'Tests' }}</h1>
+<p class="pagesub">{% if args.get('instrument') %}Test history for instrument <b>{{ args.get('instrument') }}</b>.{% elif mode=='reports' %}Search and retrieve previously generated test reports.{% else %}All tests – completed and in process.{% endif %}</p>
+{% if mode=='tests' and user.role!='viewer' %}<div class="actions-row"><a class="btn" href="{{ url_for('new_test') }}">{{ ic('plus') }} New Test</a></div>{% endif %}
+<div class="card">
+  <form class="filters" method="get">
+    <input name="q" value="{{ args.get('q','') }}" placeholder="Search by test ID, instrument, make, model, serial…">
+    {% if mode=='tests' %}<select name="status"><option value="">All status</option><option value="completed" {{ 'selected' if args.get('status')=='completed' }}>Completed</option><option value="in_process" {{ 'selected' if args.get('status')=='in_process' }}>In process</option></select>{% endif %}
+    <select name="result"><option value="">All results</option><option value="PASS" {{ 'selected' if args.get('result')=='PASS' }}>Pass</option><option value="FAIL" {{ 'selected' if args.get('result')=='FAIL' }}>Fail</option></select>
+    {% if args.get('instrument') %}<input type="hidden" name="instrument" value="{{ args.get('instrument') }}">{% endif %}
+    <button class="btn sm">{{ ic('search') }} Search</button>
+    {% if args.get('q') or args.get('status') or args.get('result') or args.get('instrument') %}<a class="btn ghost sm" href="{{ url_for(mode) }}">Clear</a>{% endif %}
+  </form>
+  {% include '_rows.html' %}
+</div>
+{% endblock %}

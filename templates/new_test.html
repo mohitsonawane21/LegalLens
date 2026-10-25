@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% from '_icons.html' import ic %}
+{% block title %}New Test{% endblock %}
+{% block content %}
+<div class="eyebrow">Test Management</div>
+<h1 class="pagetitle">New Test</h1>
+<p class="pagesub">Enter manufacturer details, instrument specifications and technical parameters.</p>
+<form method="post" class="card" id="f">
+  <div class="formgrid">
+    <div><label>Instrument ID</label><input name="instrument_id" value="{{ f.get('instrument_id') or next_id }}" required></div>
+    <div><label>Instrument type</label><select name="instrument_type">{% for o in ['Weighing Scale','Platform Scale','Counter Scale','Weighbridge','Hanging Scale','Other'] %}<option {{ 'selected' if f.get('instrument_type')==o }}>{{ o }}</option>{% endfor %}</select></div>
+    <div><label>Make / Manufacturer</label><input name="manufacturer" value="{{ f.get('manufacturer','') }}" required placeholder="e.g. Essae"></div>
+    <div><label>Model</label><input name="model" value="{{ f.get('model','') }}" required placeholder="e.g. ED-H"></div>
+    <div><label>Serial number</label><input name="serial_number" value="{{ f.get('serial_number','') }}" required></div>
+    <div><label>Accuracy class</label><select name="accuracy_class">{% for c,l in [('III','III – Medium'),('II','II – High'),('I','I – Special'),('IIII','IIII – Ordinary')] %}<option value="{{ c }}" {{ 'selected' if f.get('accuracy_class')==c }}>{{ l }}</option>{% endfor %}</select></div>
+    <div><label>Capacity (Max)</label><input name="capacity" type="number" step="any" min="0" value="{{ f.get('capacity','') }}" required></div>
+    <div><label>Scale interval (d)</label><input name="division" type="number" step="any" min="0" value="{{ f.get('division','') }}" required></div>
+    <div><label>Verification interval (e) – blank = d</label><input name="verification_interval" type="number" step="any" min="0" value="{{ f.get('verification_interval','') }}"></div>
+    <div><label>Unit</label><select name="unit"><option>kg</option><option {{ 'selected' if f.get('unit')=='g' }}>g</option></select></div>
+    <div><label>Location / laboratory</label><input name="location" value="{{ f.get('location') or (cfg.lab_name ~ ' – ' ~ cfg.lab_section) }}"></div>
+    <div><label>Date of test</label><input name="test_date" type="date" value="{{ f.get('test_date') or today }}"></div>
+    <div><label>Test standard</label><input name="test_standard" value="{{ f.get('test_standard') or 'OIML R-76' }}"></div>
+  </div>
+  <div id="live" style="margin:16px 0"></div>
+  <button class="btn">Save &amp; continue to video upload {{ ic('next') }}</button>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+const form=document.getElementById('f'), live=document.getElementById('live'); let tm;
+async function check(){
+  const b=Object.fromEntries(new FormData(form)); if(!b.capacity||!b.division){live.innerHTML='';return}
+  const r=await jpost('/api/validate-instrument',b);
+  const li=(r.issues||[]).map(i=>`<li class="${i.level}">${i.message}</li>`).join('');
+  live.innerHTML=`<div class="note">${r.n?`n = Max / e = <b>${r.n}</b>`:''}</div>`+(li?`<ul class="issues" style="margin-top:8px">${li}</ul>`:'<p class="ok" style="margin:8px 0 0">✓ Instrument data is consistent with OIML R 76.</p>');
+}
+form.addEventListener('input',()=>{clearTimeout(tm);tm=setTimeout(check,300)}); check();
+</script>
+{% endblock %}

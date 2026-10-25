@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% from '_icons.html' import ic %}
+{% block title %}Observations {{ t.id }}{% endblock %}
+{% block content %}
+<div class="eyebrow">Test Management</div>
+<h1 class="pagetitle">Test Observations</h1>
+<p class="pagesub">{{ t.id }} · {{ t.instrument_id }} · {{ t.manufacturer }} {{ t.model }} · Max {{ '%g'|format(t.capacity) }} {{ t.unit }}, d = {{ '%g'|format(t.division) }}, e = {{ '%g'|format(t.verification_interval) }}, class {{ t.accuracy_class }}</p>
+
+{% if t.status=='completed' %}<div class="flash ok">This test is completed and locked. <a href="{{ url_for('report_page', test_id=t.id) }}">View the report</a>{% if user.role=='admin' %} or reopen it from the report page{% endif %}.</div>{% elif not editable %}<div class="flash error">Your role ({{ user.role }}) has read-only access.</div>{% endif %}
+
+<div class="obs-grid">
+<div>
+  <div class="card sect">
+    <h3>{{ ic('clock') }} Laboratory &amp; environmental conditions</h3>
+    <div class="formgrid" id="envGrid">
+      <div><label>Temperature (°C)</label><input data-env="temperature_c" type="number" step="any"></div>
+      <div><label>Relative humidity (%)</label><input data-env="humidity_pct" type="number" step="any"></div>
+      <div><label>Pressure (hPa)</label><input data-env="pressure_hpa" type="number" step="any"></div>
+      <div><label>Standard weights used</label><input data-env="weights_used" placeholder="class F1 set, cert. no."></div>
+      <div><label>Tested by</label><input data-env="tested_by"></div>
+      <div><label>Remarks</label><input data-env="remarks"></div>
+    </div>
+  </div>
+
+  {% if t.reading_confirmed is not none %}
+  <div class="note" style="margin:0 0 16px">{{ ic('film') }}<div>Video evidence: confirmed display reading <b>{{ t.reading_confirmed|num(6) }} kg</b>
+    (nearest scale interval: <b>{{ snapped|num(3) }}</b>). Click an indication field, then <button type="button" class="btn sm ghost" id="insVideo" {{ '' if editable else 'disabled' }}>Insert video reading</button></div></div>
+  {% endif %}
+
+  <div class="card sect"><h3>1. Weighing test <small>R 76-2 A.4.4 · increasing &amp; decreasing load</small></h3>
+    <div style="overflow-x:auto"><table class="tbl-in" id="tW"><thead><tr><th>Load</th><th>Ind. ↑</th><th>ΔL ↑</th><th>Ind. ↓</th><th>ΔL ↓</th><th>MPE</th><th>E ↑</th><th>E ↓</th><th></th></tr></thead><tbody></tbody></table></div>
+    <div class="actions-row" style="margin:10px 0 0"><button type="button" class="btn sm ghost" id="addW">{{ ic('plus') }} Add load</button><button type="button" class="btn sm ghost" id="sugW">Suggest test loads</button></div>
+  </div>
+
+  <div class="card sect"><h3>2. Eccentricity test <small>R 76-2 A.4.7</small></h3>
+    <div style="max-width:260px;margin-bottom:8px"><label>Test load (≈ Max/3 = {{ '%.3f'|format(t.capacity/3) }} {{ t.unit }})</label><input id="eccLoad" type="number" step="any"></div>
+    <table class="tbl-in" id="tE"><thead><tr><th>Position</th><th>Indication</th><th>ΔL</th><th>MPE</th><th>Error</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card sect"><h3>3. Repeatability test <small>R 76-2 A.4.10 · 3 weighings per load</small></h3>
+    <div style="overflow-x:auto"><table class="tbl-in" id="tR"><thead><tr><th>Load</th><th>Ind. 1</th><th>ΔL</th><th>Ind. 2</th><th>ΔL</th><th>Ind. 3</th><th>ΔL</th><th>Spread</th><th>MPE</th></tr></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="card sect"><h3>4. Discrimination test <small>R 76-2 A.4.8 · add 1.4 d, indication must change by ≥ d</small></h3>
+    <table class="tbl-in" id="tD"><thead><tr><th>Load</th><th>Indication before</th><th>Indication after +1.4 d</th><th>Change</th><th>Required</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card sect"><h3>{{ ic('upload') }} Photographs &amp; supporting documents</h3>
+    <div class="drop-att">JPG / PNG / PDF / XLSX / DOCX / TXT — <button type="button" class="btn sm ghost" id="attBtn" {{ '' if editable else 'disabled' }}>Choose files</button><input type="file" id="attIn" multiple hidden accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.xlsx,.txt,.csv"></div>
+    <ul class="att-list" id="attList">{% for a in attachments %}<li><span><a href="{{ url_for('serve_attachment', aid=a.id) }}" target="_blank">{{ a.filename }}</a> <small style="color:var(--muted)">({{ a.kind }})</small></span>{% if editable %}<button class="btn sm danger" data-del="{{ a.id }}">{{ ic('trash') }}</button>{% endif %}</li>{% endfor %}</ul>
+  </div>
+</div>
+
+<aside class="sticky">
+  <div class="card">
+    <h3>{{ ic('shield') }} Live compliance</h3>
+    <div class="comp" style="margin:0 0 12px"><div class="res warn stack" id="ovBox"><strong id="ovTxt">…</strong><small id="ovSum"></small></div></div>
+    <table class="t" id="perTest"></table>
+    <h4 style="margin:14px 0 6px;font-size:13px">Validation</h4>
+    <ul class="issues" id="issues"></ul>
+    {% if editable %}<div style="display:grid;gap:10px;margin-top:14px">
+      <button class="btn ghost" id="saveBtn">Save draft</button>
+      <button class="btn green" id="genBtn">{{ ic('doc') }} Generate Report</button></div>{% endif %}
+  </div>
+</aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TID={{ t.id|tojson }}, EDIT={{ 'true' if editable else 'false' }}, CAP={{ t.capacity }}, D={{ t.division }}, E={{ t.verification_interval }}, SNAP={{ snapped|tojson }};
+const BANDS={{ rules.classes[t.accuracy_class].mpe_bands|tojson }};
+let env={{ t.env|tojson }}, obs={{ t.obs|tojson }};
+const $=id=>document.getElementById(id), num=v=>(v===''||v==null)?null:+v, val=v=>v==null?'':v;
+const POS=['Centre','Front-Left','Front-Right','Back-Left','Back-Right'];
+// ---- defaults
+obs.weighing=obs.weighing||{rows:[]}; obs.weighing.rows=obs.weighing.rows||[];
+obs.eccentricity=obs.eccentricity||{}; obs.eccentricity.rows=obs.eccentricity.rows&&obs.eccentricity.rows.length?obs.eccentricity.rows:POS.map(p=>({position:p,indication:null,delta_l:null}));
+if(obs.eccentricity.load==null) obs.eccentricity.load=+(CAP/3).toFixed(3);
+obs.repeatability=obs.repeatability||{}; if(!(obs.repeatability.series||[]).length) obs.repeatability.series=[CAP/2,CAP].map(l=>({load:l,readings:[{},{},{}]}));
+obs.discrimination=obs.discrimination||{}; if(!(obs.discrimination.rows||[]).length) obs.discrimination.rows=[{load:CAP/2},{load:CAP}];
+if(!obs.weighing.rows.length) obs.weighing.rows=Array.from({length:5},()=>({}));
+env.tested_by=env.tested_by||{{ user.full_name|tojson }};
+
+const inp=(path,type='number',extra='')=>`<input ${EDIT?'':'readonly'} data-p="${path}" type="${type}" step="any" ${extra}>`;
+function set(path,v){ const k=path.split('.'); let o=k[0]==='env'?env:obs; (k[0]==='env'?k.slice(1):k).slice(0,-1).forEach(s=>o=o[s]); o[k[k.length-1]]=v; }
+function get(path){ const k=path.split('.'); let o=k[0]==='env'?env:obs; (k[0]==='env'?k.slice(1):k).forEach(s=>o=o?.[s]); return o; }
+
+function render(){
+  $('tW').tBodies[0].innerHTML=obs.weighing.rows.map((r,i)=>`<tr data-i="${i}"><td>${inp(`weighing.rows.${i}.load`)}</td><td>${inp(`weighing.rows.${i}.ind_up`)}</td><td>${inp(`weighing.rows.${i}.dl_up`)}</td><td>${inp(`weighing.rows.${i}.ind_down`)}</td><td>${inp(`weighing.rows.${i}.dl_down`)}</td><td class="calc" id="wm${i}"></td><td class="calc" id="wu${i}"></td><td class="calc" id="wd${i}"></td><td>${EDIT?`<button type="button" class="btn sm danger" data-rm="${i}" title="Remove">×</button>`:''}</td></tr>`).join('');
+  $('eccLoad').value=val(obs.eccentricity.load); $('eccLoad').dataset.p='eccentricity.load'; $('eccLoad').readOnly=!EDIT;
+  $('tE').tBodies[0].innerHTML=obs.eccentricity.rows.map((r,i)=>`<tr><td>${inp(`eccentricity.rows.${i}.position`,'text')}</td><td>${inp(`eccentricity.rows.${i}.indication`)}</td><td>${inp(`eccentricity.rows.${i}.delta_l`)}</td><td class="calc" id="em${i}"></td><td class="calc" id="ee${i}"></td></tr>`).join('');
+  $('tR').tBodies[0].innerHTML=obs.repeatability.series.map((s,i)=>{ s.readings=s.readings||[{},{},{}]; return `<tr><td>${inp(`repeatability.series.${i}.load`)}</td>${[0,1,2].map(j=>`<td>${inp(`repeatability.series.${i}.readings.${j}.indication`)}</td><td>${inp(`repeatability.series.${i}.readings.${j}.delta_l`)}</td>`).join('')}<td class="calc" id="rs${i}"></td><td class="calc" id="rm${i}"></td></tr>`}).join('');
+  $('tD').tBodies[0].innerHTML=obs.discrimination.rows.map((r,i)=>`<tr><td>${inp(`discrimination.rows.${i}.load`)}</td><td>${inp(`discrimination.rows.${i}.ind_before`)}</td><td>${inp(`discrimination.rows.${i}.ind_after`)}</td><td class="calc" id="dc${i}"></td><td class="calc" id="dr${i}"></td></tr>`).join('');
+  document.querySelectorAll('[data-p]').forEach(el=>{ const v=get(el.dataset.p); el.value=val(v); });
+  document.querySelectorAll('[data-env]').forEach(el=>{ el.value=val(env[el.dataset.env]); el.readOnly=!EDIT; });
+}
+const mark=(ok)=>`<span class="${ok?'ok':'bad'}">${ok?'✓':'✗'}</span>`;
+const f4=v=>v==null?'–':(+v).toFixed(4);
+function paint(res){
+  const ov=res.overall||'…', box=$('ovBox'); $('ovTxt').textContent=ov; $('ovSum').textContent=res.summary||'';
+  box.className='res stack '+(ov==='PASS'?'':(ov==='FAIL'?'fail':'warn'));
+  const T=res.tests||{};
+  $('perTest').innerHTML=Object.values(T).map(x=>`<tr><td>${x.title}</td><td style="text-align:right"><span class="chip ${x.pass?'pass':(x.evaluated?'fail':'warn')}">${x.pass?'PASS':(x.evaluated?'FAIL':'—')}</span></td></tr>`).join('');
+  let all=[...(res.instrument_issues||[]),...(res.environment_issues||[])]; Object.values(T).forEach(x=>all.push(...(x.issues||[])));
+  $('issues').innerHTML=all.length?all.map(i=>`<li class="${i.level}">${i.message}</li>`).join(''):'<li class="info">No validation issues.</li>';
+  document.querySelectorAll('.calc').forEach(c=>c.innerHTML='');
+  (T.weighing?.rows||[]).forEach(r=>{ const i=r.idx; $('wm'+i)&&($('wm'+i).textContent='±'+f4(r.mpe)); if(r.up&&$('wu'+i)) $('wu'+i).innerHTML=(r.up.error>=0?'+':'')+f4(r.up.error)+' '+mark(r.up.pass); if(r.down&&$('wd'+i)) $('wd'+i).innerHTML=(r.down.error>=0?'+':'')+f4(r.down.error)+' '+mark(r.down.pass); });
+  (T.eccentricity?.rows||[]).forEach(r=>{ const i=r.idx; $('em'+i)&&($('em'+i).textContent='±'+f4(r.mpe)); $('ee'+i)&&($('ee'+i).innerHTML=(r.error>=0?'+':'')+f4(r.error)+' '+mark(r.pass)); });
+  (T.repeatability?.series||[]).forEach(r=>{ const i=r.idx; $('rs'+i)&&($('rs'+i).innerHTML=f4(r.spread)+' '+mark(r.pass)); $('rm'+i)&&($('rm'+i).textContent='±'+f4(r.mpe)); });
+  (T.discrimination?.rows||[]).forEach(r=>{ const i=r.idx; $('dc'+i)&&($('dc'+i).textContent=f4(r.change)); $('dr'+i)&&($('dr'+i).innerHTML='≥ '+f4(r.required)+' '+mark(r.pass)); });
+}
+let tm; async function evaluate(){ const r=await jpost(`/api/tests/${TID}/evaluate`,{env,obs}); if(!r.error) paint(r); }
+const sched=()=>{clearTimeout(tm);tm=setTimeout(evaluate,350)};
+let lastFocus=null;
+document.addEventListener('focusin',e=>{ if(e.target.matches('[data-p]')) lastFocus=e.target });
+document.addEventListener('input',e=>{
+  const el=e.target; if(el.dataset.env){ env[el.dataset.env]=(el.type==='number')?num(el.value):el.value; return sched(); }
+  if(el.dataset.p){ set(el.dataset.p, el.type==='number'?num(el.value):el.value); sched(); }
+});
+document.addEventListener('click',async e=>{
+  const rm=e.target.closest('[data-rm]'); if(rm){ obs.weighing.rows.splice(+rm.dataset.rm,1); render(); sched(); }
+  const del=e.target.closest('[data-del]'); if(del){ const r=await api('/api/attachments/'+del.dataset.del,{method:'DELETE'}); if(r.ok){ del.closest('li').remove(); toast('Attachment removed') } else toast(r.error,true) }
+});
+$('addW').onclick=()=>{ if(!EDIT) return; obs.weighing.rows.push({}); render(); };
+$('sugW').onclick=()=>{ if(!EDIT) return;
+  const r2=v=>Math.round(v/E)*E, set_=new Set([r2(20*E)]); BANDS.forEach(b=>{ if(b[0]&&b[0]*E<CAP) set_.add(r2(b[0]*E)); }); set_.add(r2(CAP/2)); set_.add(CAP);
+  const loads=[...set_].sort((a,b)=>a-b).map(v=>+v.toFixed(6)); const old=obs.weighing.rows;
+  obs.weighing.rows=loads.map((l,i)=>({...(old.find(o=>+o.load===l)||{}),load:l})); render(); sched(); toast('Suggested loads: Min (20e), MPE change-over points, ½ Max and Max'); };
+if($('insVideo')) $('insVideo').onclick=()=>{ if(!lastFocus||lastFocus.dataset.p.includes('delta_l')||lastFocus.dataset.p.endsWith('.load')) return toast('Click an indication field first',true); lastFocus.value=SNAP; lastFocus.dispatchEvent(new Event('input',{bubbles:true})); };
+$('attBtn').onclick=()=>$('attIn').click();
+$('attIn').onchange=async e=>{ const fd=new FormData(); [...e.target.files].forEach(f=>fd.append('files',f)); const r=await api(`/api/tests/${TID}/attachments`,{method:'POST',body:fd}); if(r.ok){ toast('Attachment(s) uploaded'); setTimeout(()=>location.reload(),600) } else toast(r.error,true) };
+async function save(){ const r=await jpost(`/api/tests/${TID}/observations`,{env,obs}); if(r.ok){ toast('Draft saved'); paint(r.result) } else toast(r.error,true); return r }
+if($('saveBtn')) $('saveBtn').onclick=save;
+if($('genBtn')) $('genBtn').onclick=async()=>{
+  $('genBtn').disabled=true; let r=await jpost(`/api/tests/${TID}/generate`,{env,obs});
+  if(r._status===409 && r.incomplete){ if(confirm(r.error+'\n\nGenerate the report anyway (it will be marked INCOMPLETE)?')) r=await jpost(`/api/tests/${TID}/generate`,{env,obs,allow_incomplete:true}); else { $('genBtn').disabled=false; return } }
+  if(r.ok) location.href=r.url; else { toast(r.error,true); $('genBtn').disabled=false }
+};
+render(); evaluate();
+</script>
+{% endblock %}

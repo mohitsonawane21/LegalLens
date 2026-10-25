@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+{% from '_icons.html' import ic %}
+{% block title %}Upload Test Video{% endblock %}
+{% block content %}
+<div class="up-grid">
+  <div class="head">
+    <div class="eyebrow">Test Management</div>
+    <h1 class="pagetitle">Upload Test Video</h1>
+    <p class="pagesub">Upload a video of the weighing instrument display for automatic weight reading.</p>
+  </div>
+  <!-- LEFT : upload / record -->
+  <div class="left">
+    <div class="dz">
+      <div class="drop" id="drop">
+        <svg class="vid-ico" viewBox="0 0 82 70" aria-hidden="true"><rect x="2" y="6" width="56" height="44" rx="8" fill="#063b78"/><path d="M58 20 80 8v40L58 36z" fill="#063b78"/><circle cx="52" cy="50" r="15" fill="#fff"/><circle cx="52" cy="50" r="12" fill="#063b78"/><path d="M52 57V43M46 49l6-6 6 6" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <h3>Upload Video</h3>
+        <p>Drag &amp; drop your test video here or<br>browse from your device.</p>
+        <input type="file" id="file" hidden accept=".mp4,.mov,.avi,.webm,video/mp4,video/quicktime,video/x-msvideo,video/webm">
+        <button class="btn" id="browse" {{ '' if editable else 'disabled' }}>{{ ic('upload') }} Browse Video</button>
+        <div class="prog" id="prog"><i></i></div>
+        <p class="fine">Supported formats: MP4, MOV, AVI &nbsp;•&nbsp; Max size 500 MB</p>
+        {% if editable %}<a href="#" id="useSample" style="font-size:12.5px;margin-top:6px">No video handy? Use the bundled sample video</a>{% endif %}
+      </div>
+    </div>
+    <div class="rec">
+      <div class="ic">{{ ic('camera') }}</div>
+      <div>
+        <h4>Record Video</h4>
+        <p>Record a video directly from your device camera.</p>
+        <button class="btn ghost sm" id="recBtn" {{ '' if editable else 'disabled' }}>{{ ic('film') }} <span id="recLbl">Start Recording</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT : preview + extraction -->
+  <div class="right">
+    <div class="vp">
+      <h3>{{ ic('video-up') }} Video Preview</h3>
+      <div class="vp-body">
+        <div class="player" id="player">
+          <video id="vid" playsinline preload="metadata" {% if t.video_file %}src="{{ url_for('serve_video', test_id=t.id) }}"{% endif %} {% if t.video_file == sample %}poster="{{ url_for('static', filename='img/poster.jpg') }}"{% endif %}></video>
+          <div class="empty" id="vEmpty" {% if t.video_file %}style="display:none"{% endif %}>{{ ic('film') }}<span>No video yet.<br>Upload or record one to begin.</span></div>
+          <div class="tchip" id="tchip" {% if not t.video_file %}style="display:none"{% endif %}>{{ ic('clock') }}<span id="dur">00:00</span></div>
+          <button class="play" id="playBtn" aria-label="Play" {% if not t.video_file %}style="display:none"{% endif %}><svg viewBox="0 0 24 24"><path d="M6 3.5v17l14-8.5z"/></svg></button>
+          <div class="bar" id="bar" {% if not t.video_file %}style="display:none"{% endif %}>
+            <button id="barPlay" aria-label="Play/Pause"><svg viewBox="0 0 24 24" style="fill:#fff"><path d="M7 4v16l13-8z"/></svg><span id="tcur">00:00 / 00:00</span></button>
+            <button id="fs" aria-label="Fullscreen">{{ ic('full') }}</button>
+          </div>
+        </div>
+        <div class="side-cards">
+          <div class="er pending" id="erCard">
+            <h4>{{ ic('lock') }} Extracted Reading</h4>
+            <div class="val" id="erVal">—</div>
+            <div class="st" id="erSt"><span>Waiting for video</span></div>
+          </div>
+          <div class="vr">
+            <h4>{{ ic('shield') }} Verify detected reading</h4>
+            <p>Please review and confirm the reading before proceeding.</p>
+            <div class="field">{{ ic('scale') }}<input id="vrIn" inputmode="decimal" autocomplete="off" placeholder="e.g. 25.162626" {{ '' if editable else 'disabled' }}><span>kg</span></div>
+            <button class="btn green" id="confirmBtn" disabled>{{ ic('check') }} Confirm Reading</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="meta">
+      <div>{{ ic('doc') }}<span><small>Test ID</small><b>{{ t.id }}</b></span></div>
+      <div>{{ ic('lock') }}<span><small>Instrument ID</small><b>{{ t.instrument_id }}</b></span></div>
+      <div>{{ ic('user') }}<span><small>Uploaded by</small><b>{{ t.created_by }}</b></span></div>
+      <div>{{ ic('calendar') }}<span><small>Upload time</small><b id="upT">{{ (t.video_uploaded_at or '') | dt if t.video_uploaded_at else '–' }}</b></span></div>
+      <div>{{ ic('link') }}<span><small>Evidence will be linked</small><b>to the final report.</b></span></div>
+    </div>
+  </div>
+</div>
+
+<div class="steps" id="steps">
+  <div class="s" data-s="1"><i>1</i>Upload Video</div><span class="arr">→</span>
+  <div class="s" data-s="2"><i>2</i>Extract Reading</div><span class="arr">→</span>
+  <div class="s" data-s="3"><i>3</i>Verify</div><span class="arr">→</span>
+  <div class="s" data-s="4"><i>4</i>Continue to Test</div>
+  <a class="btn go disabled" id="goBtn" href="{{ url_for('observations_page', test_id=t.id) }}">Continue to Test <svg class="ico" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TID = {{ t.id|tojson }}, EDIT = {{ 'true' if editable else 'false' }};
+const S = { video: {{ 'true' if t.video_file else 'false' }}, raw: {{ t.reading_raw|tojson }}, conf: {{ t.reading_confirmed|tojson }}, dur: {{ (t.video_duration or 0)|tojson }}, extracted: {{ 'true' if (t.reading_raw is not none or t.reading_confirmed is not none) else 'false' }} };
+const $ = id => document.getElementById(id);
+const vid = $('vid'), mmss = s => { s = Math.max(0, Math.round(s||0)); return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0') };
+const fmtKg = v => (v==null? '—' : (+v).toString());
+
+function paintSteps(){
+  const cur = !S.video ? 1 : (!S.extracted ? 2 : (S.conf==null ? 3 : 4));
+  document.querySelectorAll('#steps .s').forEach(e => { const n=+e.dataset.s; e.className='s'+(n<cur?' done':'')+(n===cur?' cur':''); });
+  $('goBtn').classList.toggle('disabled', S.conf==null);
+}
+function paintReading(state, msg){
+  const c=$('erCard'), v=$('erVal'), st=$('erSt');
+  const ok='<svg viewBox="0 0 24 24" style="stroke:#087a55;fill:none;stroke-width:1.8"><circle cx="12" cy="12" r="9" fill="#087a55" stroke="none"/><path d="m7.8 12.3 2.9 2.9 5.5-5.9" stroke="#fff"/></svg>';
+  if(state==='busy'){c.className='er pending';v.innerHTML='<span class="spin"></span>';st.innerHTML='<span>'+msg+'</span>';}
+  else if(state==='ok'){c.className='er';v.textContent=fmtKg(S.raw)+' kg';st.innerHTML=ok+'<span>Reading Detected</span>';}
+  else if(state==='warn'){c.className='er warn';v.textContent='—';st.innerHTML='<span>'+msg+'</span>';}
+  else {c.className='er pending';v.textContent='—';st.innerHTML='<span>'+(msg||'Waiting for video')+'</span>';}
+}
+function loadVideoUI(url, dur, uploadedAt){
+  S.video=true; S.dur=dur;
+  vid.src = url + '?t=' + Date.now(); vid.removeAttribute('poster'); vid.load();
+  $('vEmpty').style.display='none'; ['tchip','playBtn','bar'].forEach(i=>$(i).style.display='');
+  $('dur').textContent = mmss(dur); $('tcur').textContent = '00:00 / '+mmss(dur);
+  if(uploadedAt) $('upT').textContent = new Date(uploadedAt.replace(' ','T')).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function setConfirmEnabled(){ $('confirmBtn').disabled = !EDIT || !S.video || !/^\d+(\.\d+)?$/.test($('vrIn').value.trim()); }
+
+async function extract(){
+  paintReading('busy','Extracting reading from video…'); $('confirmBtn').disabled=true;
+  const r = await jpost(`/api/tests/${TID}/extract`);
+  S.extracted = true;
+  if(r.ok && r.reading!=null){ S.raw=r.reading; $('vrIn').value=r.text; paintReading('ok'); toast('Reading detected: '+r.text+' kg'); }
+  else { S.raw=null; paintReading('warn', r.error ? 'Automatic reading unavailable' : 'No clear reading found'); toast(r.error || 'Could not read the display automatically. Please type the reading.', true); }
+  setConfirmEnabled(); paintSteps();
+}
+
+function upload(file, sample){
+  const fd = new FormData(); if(sample) fd.append('sample','1'); else fd.append('video', file);
+  const prog=$('prog'), bar=prog.firstElementChild; prog.style.display='block'; bar.style.width='0';
+  return new Promise(res=>{
+    const x=new XMLHttpRequest(); x.open('POST',`/api/tests/${TID}/video`);
+    x.upload.onprogress=e=>{ if(e.lengthComputable) bar.style.width=(e.loaded/e.total*100)+'%' };
+    x.onload=async ()=>{
+      prog.style.display='none'; let j={}; try{j=JSON.parse(x.responseText)}catch(e){}
+      if(x.status!==200){ toast(j.error||'Upload failed',true); return res(false) }
+      S.raw=null; S.conf=null; S.extracted=false; $('vrIn').value='';
+      loadVideoUI(j.url, j.duration, j.uploaded_at); toast('Video uploaded'); paintSteps(); await extract(); res(true);
+    };
+    x.onerror=()=>{prog.style.display='none'; toast('Network error during upload',true); res(false)};
+    x.send(fd);
+  });
+}
+
+// ---- wiring
+$('browse').onclick = () => $('file').click();
+$('file').onchange = e => { const f=e.target.files[0]; if(!f) return; if(f.size>500*1024*1024) return toast('File exceeds 500 MB',true); upload(f); e.target.value=''; };
+const drop=$('drop');
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault(); if(EDIT) drop.classList.add('over')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault(); drop.classList.remove('over')}));
+drop.addEventListener('drop',e=>{ if(!EDIT) return; const f=e.dataTransfer.files[0]; if(f) upload(f) });
+if($('useSample')) $('useSample').onclick = e => { e.preventDefault(); upload(null,true) };
+$('vrIn').oninput = setConfirmEnabled;
+$('confirmBtn').onclick = async () => {
+  const r = await jpost(`/api/tests/${TID}/confirm`, {reading: $('vrIn').value.trim()});
+  if(r.ok){ S.conf=r.reading; toast('Reading confirmed'+(r.edited?' (manually edited)':'')); $('confirmBtn').innerHTML=$('confirmBtn').innerHTML.replace('Confirm Reading','Reading Confirmed'); setTimeout(()=>$('confirmBtn').innerHTML=$('confirmBtn').innerHTML.replace('Reading Confirmed','Confirm Reading'),1800); paintSteps(); }
+  else toast(r.error,true);
+};
+// player
+function togglePlay(){ vid.paused ? vid.play() : vid.pause() }
+$('playBtn').onclick = $('barPlay').onclick = togglePlay;
+vid.onclick = togglePlay;
+vid.onplay = () => $('player').classList.add('playing'); vid.onpause = () => $('player').classList.remove('playing');
+vid.ontimeupdate = () => $('tcur').textContent = mmss(vid.currentTime)+' / '+mmss(vid.duration||S.dur);
+vid.onloadedmetadata = () => { if(isFinite(vid.duration)){ $('dur').textContent=mmss(vid.duration); $('tcur').textContent='00:00 / '+mmss(vid.duration);} };
+$('fs').onclick = () => { const p=$('player'); (document.fullscreenElement? document.exitFullscreen() : p.requestFullscreen && p.requestFullscreen()) };
+
+// ---- record from camera
+let rec, chunks=[], stream;
+$('recBtn').onclick = async () => {
+  const lbl=$('recLbl');
+  if(rec && rec.state==='recording'){ rec.stop(); return; }
+  if(!navigator.mediaDevices || !window.MediaRecorder) return toast('Camera recording is not supported in this browser (needs HTTPS or localhost).',true);
+  try{ stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false}); }
+  catch(e){ return toast('Camera permission denied or unavailable.',true) }
+  chunks=[]; rec=new MediaRecorder(stream); rec.ondataavailable=e=>e.data.size&&chunks.push(e.data);
+  rec.onstop = async () => {
+    stream.getTracks().forEach(t=>t.stop()); vid.srcObject=null; lbl.textContent='Start Recording';
+    const blob=new Blob(chunks,{type:rec.mimeType||'video/webm'}); await upload(new File([blob],'recording-'+Date.now()+'.webm',{type:blob.type}));
+  };
+  vid.srcObject=stream; vid.muted=true; vid.play(); $('vEmpty').style.display='none'; vid.style.display='';
+  rec.start(); lbl.textContent='Stop & Use Recording';
+};
+
+// ---- initial paint
+if(S.video){ $('dur').textContent=mmss(S.dur); $('tcur').textContent='00:00 / '+mmss(S.dur); }
+if(S.conf!=null){ $('vrIn').value=S.conf; S.raw = S.raw ?? S.conf; paintReading('ok'); }
+else if(S.raw!=null){ $('vrIn').value=S.raw; paintReading('ok'); }
+else if(S.video){ paintReading('warn','Reading not extracted yet'); extract(); }
+setConfirmEnabled(); paintSteps();
+</script>
+{% endblock %}

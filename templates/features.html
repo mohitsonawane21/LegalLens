@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% from '_icons.html' import ic %}
+{% block title %}Features{% endblock %}
+{% block content %}
+<div class="eyebrow">Capabilities</div>
+<h1 class="pagetitle">Features</h1>
+<p class="pagesub">Problem Statement 26035 – test-report generation for NAWI as per OIML R 76 – and how each requirement is met.</p>
+{% set F = [
+ ('Instrument &amp; manufacturer details','Make, model, serial no., Max, d, e, accuracy class, location – validated against OIML R 76 limits (n = Max/e, class ranges).','tests'),
+ ('Lab &amp; environmental conditions','Temperature, humidity, pressure, standard weights; flagged when outside reference range.','settings'),
+ ('Observations for all prescribed tests','Weighing (increasing / decreasing), eccentricity, repeatability, discrimination – rule-driven from JSON.','tests'),
+ ('Automatic calculations','n, MPE band (0.5e / 1.0e / 1.5e), rounding-corrected error E = I + ½e − ΔL − L, spreads and changes.','scale'),
+ ('Validation checks','Live checks on every entry: range, ΔL, loads vs Max, minimum number of loads, data completeness.','shield'),
+ ('Automatic pass / fail','Per-test and overall compliance with plain-language remarks, as per the loaded OIML R 76 edition.','check'),
+ ('Video reading extraction','Upload or record a video of the display; OCR extracts the reading, operator verifies &amp; confirms; linked as evidence.','video-up'),
+ ('Standardised reports','Auto-populated lab &amp; instrument details; PDF (printable) and editable DOCX; page preview in the app.','doc'),
+ ('Photos &amp; supporting documents','Attach images / PDF / XLSX; thumbnails embedded in the report; SHA-256 per file.','upload'),
+ ('Digital signature &amp; QR verification','HMAC-signed reports, SHA-256 report hash and QR link to a public verification page.','pen'),
+ ('Repository, search &amp; history','Instrument-wise test history, full-text search, filters by result / status.','reports'),
+ ('Dashboard &amp; role-based access','Completed / in-process counts, recent tests; admin, tester, viewer roles; full audit trail.','home'),
+] %}
+<div class="feat">{% for t,d,i in F %}<div class="card"><h3>{{ ic(i) }} {{ t|safe }}</h3><p>{{ d|safe }}</p></div>{% endfor %}</div>
+<div class="card" style="margin-top:18px;font-size:13px"><b>Environment:</b>
+ OCR (Tesseract): <span class="chip {{ 'pass' if ocr_ok else 'warn' }}">{{ 'available' if ocr_ok else 'not installed – manual entry fallback' }}</span>
+ &nbsp; PDF page preview (poppler): <span class="chip {{ 'pass' if pdftoppm else 'warn' }}">{{ 'available' if pdftoppm else 'not installed – browser PDF viewer used' }}</span></div>
+{% endblock %}

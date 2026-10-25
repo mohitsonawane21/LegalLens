@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Verify report{% endblock %}
+{% block content %}
+<div class="login-wrap" style="max-width:640px">
+  <div class="eyebrow">Report verification</div>
+  <h1 class="pagetitle" style="font-size:34px">Test Report {{ t.id if t else '' }}</h1>
+  {% if status=='authentic' %}
+    <div class="banner" style="min-width:0"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#15803d"/><path d="m7 12.4 3.2 3.2L17 8.8" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg><div><b>Authentic</b><span>The stored record matches the SHA-256 hash printed on this report.</span></div></div>
+  {% elif status=='tampered' %}
+    <div class="note bad"><div><b>Verification failed.</b> The record no longer matches the hash on the report – it was changed after generation, or the link was altered.</div></div>
+  {% else %}
+    <div class="note bad"><div>No generated report was found for this ID.</div></div>
+  {% endif %}
+  {% if t and t.report_hash %}
+  <div class="card kv" style="margin-top:16px">
+    <div class="row"><span>Instrument</span><b>{{ t.instrument_id }} · {{ t.manufacturer }} {{ t.model }} ({{ t.serial_number }})</b></div>
+    <div class="row"><span>Test date</span><b>{{ t.test_date|dt('date') }}</b></div>
+    <div class="row"><span>Standard</span><b>{{ t.test_standard }}</b></div>
+    <div class="row"><span>Overall result</span><b>{{ t.result.get('overall') }}</b></div>
+    <div class="row"><span>Generated</span><b>{{ t.report_generated_at|dt }}</b></div>
+    <div class="row"><span>Digital signature</span><b>{% if t.signed_by %}{{ t.signed_by }} ({{ t.signed_designation }}), {{ t.signed_at|dt }} – {{ 'valid' if detail.signature_ok else 'INVALID' }}{% else %}not signed{% endif %}</b></div>
+    <div class="row"><span>SHA-256</span><b style="font-family:monospace;font-size:12px;word-break:break-all">{{ t.report_hash }}</b></div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
