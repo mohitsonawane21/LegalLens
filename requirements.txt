@@ -6,4 +6,4 @@ opencv-python-headless>=4.9
 pytesseract>=0.3.10
 numpy>=1.26
 supabase>=2.0.0
-libsql-experimental
+libsql
